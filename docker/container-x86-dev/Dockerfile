@@ -47,6 +47,58 @@ RUN . /opt/dua-venv/bin/activate && yes | pip3 install -U \
   pymavlink \
   pyulog
 
+# Install NuttX toolchain dependencies
+# Get these from: PX4-Autopilot/Tools/setup/ubuntu.sh and merge with your base unit's contents
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  automake \
+  binutils-dev \
+  bison \
+  flex \
+  g++-multilib \
+	gcc-multilib \
+	gdb-multiarch \
+	genromfs \
+	gettext \
+	gperf \
+  libelf-dev \
+	libexpat-dev \
+	libgmp-dev \
+	libisl-dev \
+	libmpc-dev \
+	libmpfr-dev \
+	libncurses5 \
+	libncurses5-dev \
+	libncursesw5-dev \
+	libtool \
+  texinfo \
+  u-boot-tools \
+  util-linux \
+  vim-common && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*/apt/lists/*
+
+# Download and install NuttX toolchain (pray that this remains online)
+WORKDIR /opt
+RUN wget -O /tmp/gcc-arm-none-eabi-9-2020-q2-update-linux.tar.bz2 https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/9-2020q2/gcc-arm-none-eabi-9-2020-q2-update-x86_64-linux.tar.bz2 && \
+  tar -jxf /tmp/gcc-arm-none-eabi-9-2020-q2-update-linux.tar.bz2 -C /opt/ && \
+  rm /tmp/gcc-arm-none-eabi-9-2020-q2-update-linux.tar.bz2 && \
+  chgrp -R internal gcc-arm-none-eabi-9-2020-q2-update && \
+  chmod -R g+rw gcc-arm-none-eabi-9-2020-q2-update
+ENV PATH=/opt/gcc-arm-none-eabi-9-2020-q2-update/bin:${PATH}
+WORKDIR /root
+
+# Build and install Foonathan memory allocator
+WORKDIR /opt
+RUN git clone --single-branch --branch 'v1.3.0' https://github.com/eProsima/foonathan_memory_vendor.git && \
+  cd foonathan_memory_vendor && \
+  mkdir build && \
+  cd build && \
+  cmake .. && \
+  cmake --build . --target install && \
+  cd ../.. && \
+  chgrp -R internal foonathan_memory_vendor && \
+  chmod -R g+rw foonathan_memory_vendor
+WORKDIR /root
+
 # Build and install Fast-DDS-Gen (required by microRTPS Bridge)
 WORKDIR /opt
 RUN git clone --recursive --single-branch --branch 'v2.4.0' https://github.com/eProsima/Fast-DDS-Gen.git && \
@@ -58,6 +110,34 @@ RUN git clone --recursive --single-branch --branch 'v2.4.0' https://github.com/e
   chmod -R g+rw Fast-DDS-Gen
 WORKDIR /root
 ENV PATH=/opt/Fast-DDS-Gen/scripts:${PATH}
+
+# Build and install Fast-CDR
+WORKDIR /opt
+RUN git clone --single-branch --branch 'v1.1.1' https://github.com/eProsima/Fast-CDR.git && \
+  cd Fast-CDR && \
+  mkdir build && \
+  cd build && \
+  cmake .. && \
+  make -j$(nproc --all) && \
+  make install -j$(nproc --all) && \
+  cd ../.. && \
+  chgrp -R internal Fast-CDR && \
+  chmod -R g+rw Fast-CDR
+WORKDIR /root
+
+# Build and install Fast-DDS
+WORKDIR /opt
+RUN git clone --single-branch --branch 'v2.10.1' https://github.com/eProsima/Fast-DDS.git && \
+  cd Fast-DDS && \
+  mkdir build && \
+  cd build && \
+  cmake -DTHIRDPARTY=ON .. && \
+  make -j$(nproc --all) && \
+  make install -j$(nproc --all) && \
+  cd ../.. && \
+  chgrp -R internal Fast-DDS && \
+  chmod -R g+rw Fast-DDS
+WORKDIR /root
 # flight_stack END #
 # IMAGE SETUP END #
 
